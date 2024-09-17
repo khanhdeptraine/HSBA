@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import getWeb3 from "./getWeb3";
 import { useParams, useNavigate } from "react-router-dom";
-import patientContract from "./contracts/AddPatientRecord.json"; // ABI of the patient record contract
+import patientContract from "./contracts/AddPatientRecord.json"; // ABI của hợp đồng hồ sơ bệnh nhân
 import axios from "axios";
 
 function ProfilePatient() {
@@ -13,11 +13,13 @@ function ProfilePatient() {
     const [file, setFile] = useState(null);
     const [imageUrls, setImageUrls] = useState([]);
     const [accounts, setAccounts] = useState(null);
+    const [message, setMessage] = useState(""); // Thông báo lỗi hoặc thành công
     const navigate = useNavigate();
 
     useEffect(() => {
         const init = async () => {
             try {
+                // Get Web3 instance
                 const web3 = await getWeb3();
                 const networkId = await web3.eth.net.getId();
                 const deployedNetwork = patientContract.networks[networkId];
@@ -31,6 +33,7 @@ function ProfilePatient() {
                 setAccounts(accounts);
 
                 if (patientAddress) {
+                    // Fetch patient record from blockchain
                     const result = await contractInstance.methods.getRecord(patientAddress).call();
                     const recordData = {
                         fullName: result[0],
@@ -48,7 +51,7 @@ function ProfilePatient() {
                     setRecord(recordData);
                     setEditableRecord(recordData);
 
-                    // Cập nhật danh sách ảnh từ CID
+                    // Update image URLs from CID
                     if (result[7].length > 0) {
                         const urls = result[7].map(cid => `https://gateway.pinata.cloud/ipfs/${cid}`);
                         setImageUrls(urls);
@@ -56,6 +59,7 @@ function ProfilePatient() {
                 }
             } catch (error) {
                 console.error("Lỗi khi kết nối với blockchain:", error);
+                setMessage("Không thể kết nối với blockchain. Vui lòng thử lại.");
             }
         };
 
@@ -75,7 +79,6 @@ function ProfilePatient() {
         const url = `https://api.pinata.cloud/pinning/pinFileToIPFS`;
         let data = new FormData();
         data.append("file", file);
-
         const pinataApiKey = "1d570e375d82ae085962";
         const pinataSecretApiKey = "d3fb38e777a9d31064b463aa79d55d45ea95c037e4571b3c514c9f1983f39a47";
 
@@ -90,14 +93,14 @@ function ProfilePatient() {
 
             const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`;
             setImageUrls([...imageUrls, ipfsUrl]);
-            setEditableRecord((prevState) => ({
+            setEditableRecord(prevState => ({
                 ...prevState,
                 mriOrXrayCIDs: [...prevState.mriOrXrayCIDs, res.data.IpfsHash]
             }));
             alert("Tải ảnh lên thành công!");
         } catch (error) {
             console.error("Lỗi khi tải ảnh lên:", error);
-            alert("Không thể tải ảnh lên.");
+            alert("Không thể tải ảnh lên. Vui lòng thử lại.");
         }
     };
 
@@ -113,7 +116,8 @@ function ProfilePatient() {
 
         try {
             await contract.methods
-                .addRecord(
+                .updateRecord(
+                    patientAddress,
                     editableRecord.fullName,
                     editableRecord.dateOfBirth,
                     editableRecord.hometown,
@@ -133,12 +137,17 @@ function ProfilePatient() {
             navigate(`/profilePatient/${patientAddress}`);
         } catch (error) {
             console.error("Lỗi khi cập nhật hồ sơ:", error);
-            alert("Không thể cập nhật hồ sơ.");
+            alert("Không thể cập nhật hồ sơ. Vui lòng thử lại.");
         }
+    };
+
+    const handleBack = () => {
+        navigate(-1); // Trở về trang trước đó
     };
 
     return (
         <div>
+            <button onClick={handleBack}>Quay lại</button>
             <h1>Hồ Sơ Bệnh Nhân</h1>
             {record && !isEditing ? (
                 <div>
@@ -161,7 +170,7 @@ function ProfilePatient() {
                     <p><strong>Chẩn đoán:</strong> {record.diagnosis}</p>
                     <p><strong>Tiền sử bệnh:</strong> {record.medicalHistory}</p>
                     <p><strong>Kết luận:</strong> {record.conclusion}</p>
-                    <button onClick={() => setIsEditing(true)}>Cập nhật hồ sơ</button>
+                    <button onClick={() => setIsEditing(true)}>Chỉnh sửa hồ sơ</button>
                 </div>
             ) : (
                 isEditing && (
@@ -238,11 +247,12 @@ function ProfilePatient() {
                         />
                         <input type="file" onChange={handleFileChange} />
                         <button type="button" onClick={handleUploadToPinata}>Tải ảnh lên</button>
-                        <button type="submit">Cập nhật</button>
+                        <button type="submit">Cập nhật hồ sơ</button>
                         <button type="button" onClick={() => setIsEditing(false)}>Hủy</button>
                     </form>
                 )
             )}
+            {message && <p>{message}</p>}
         </div>
     );
 }
