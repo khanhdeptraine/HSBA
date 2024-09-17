@@ -2,13 +2,15 @@ import React, { useState, useEffect } from "react";
 import getWeb3 from "./getWeb3";
 import patientRecordContract from "./contracts/AddPatientRecord.json"; // ABI của hợp đồng AddPatientRecord
 import axios from "axios";
+import { useNavigate, useParams } from "react-router-dom";
 
 function AddPatientRecord() {
     const [contract, setContract] = useState(null);
-    const [files, setFiles] = useState([]); // Thay đổi thành mảng tệp tin
-    const [imageUrls, setImageUrls] = useState([]); // Thay đổi thành mảng URL
+    const [files, setFiles] = useState([]);
+    const [imageUrls, setImageUrls] = useState([]);
     const [accounts, setAccounts] = useState(null);
     const [newRecord, setNewRecord] = useState({
+        username: "",
         fullName: "",
         dateOfBirth: "",
         hometown: "",
@@ -16,11 +18,13 @@ function AddPatientRecord() {
         cccd: "",
         healthInsuranceNumber: "",
         admissionDateTime: "",
-        mriOrXrayCIDs: [], // Thay đổi thành mảng CID
+        mriOrXrayCIDs: [],
         diagnosis: "",
         medicalHistory: "",
         conclusion: ""
     });
+    const navigate = useNavigate();
+    const { username } = useParams();
 
     useEffect(() => {
         const init = async () => {
@@ -41,13 +45,18 @@ function AddPatientRecord() {
                 setContract(contractInstance);
                 const accounts = await web3.eth.getAccounts();
                 setAccounts(accounts);
+
+                setNewRecord((prevState) => ({
+                    ...prevState,
+                    username: username || ""
+                }));
             } catch (error) {
                 console.error("Lỗi khi kết nối với blockchain:", error);
             }
         };
 
         init();
-    }, []);
+    }, [username]);
 
     const handleFilesChange = (e) => {
         setFiles(Array.from(e.target.files));
@@ -98,6 +107,9 @@ function AddPatientRecord() {
             [e.target.name]: e.target.value
         });
     };
+    const handleBack = () => {
+        navigate(-1); // Trở về trang trước đó
+    };
 
     const handleAddRecord = async (e) => {
         e.preventDefault();
@@ -125,7 +137,13 @@ function AddPatientRecord() {
                 .send({ from: accounts[0], gas: 3000000 });
 
             alert("Thêm hồ sơ bệnh án thành công!");
+
+            // Chuyển hướng và truyền thông tin bệnh án vừa thêm
+            navigate('/newRecord', { state: { record: newRecord, imageUrls } });
+
+            // Reset form
             setNewRecord({
+                username: "",
                 fullName: "",
                 dateOfBirth: "",
                 hometown: "",
@@ -133,7 +151,7 @@ function AddPatientRecord() {
                 cccd: "",
                 healthInsuranceNumber: "",
                 admissionDateTime: "",
-                mriOrXrayCIDs: [], // Reset mảng CID
+                mriOrXrayCIDs: [],
                 diagnosis: "",
                 medicalHistory: "",
                 conclusion: ""
@@ -147,7 +165,9 @@ function AddPatientRecord() {
     };
 
     return (
+
         <div>
+            <button onClick={handleBack}>Quay lại</button>
             <h1>Thêm Hồ Sơ Bệnh Án</h1>
             <form onSubmit={handleAddRecord}>
                 <input
